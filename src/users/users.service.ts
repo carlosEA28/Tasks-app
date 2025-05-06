@@ -3,10 +3,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/createUserDto';
 import { create } from 'domain';
 import { UpdatedUserDto } from './dto/updateUserDto';
+import { HashingServiceProtocol } from 'src/auth/hash/hashign.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly hashingSerivice: HashingServiceProtocol,
+  ) {}
   async findById(id: number) {
     const user = await this.prisma.user.findFirst({
       where: {
@@ -26,11 +30,15 @@ export class UsersService {
   }
 
   async createUser(createUserDto: CreateUserDto) {
+    const hashedPassword = await this.hashingSerivice.hash(
+      createUserDto.password,
+    );
+
     const user = this.prisma.user.create({
       data: {
         name: createUserDto.name,
         email: createUserDto.email,
-        passwordHash: createUserDto.password,
+        passwordHash: hashedPassword,
       },
       select: {
         id: true,
@@ -54,16 +62,29 @@ export class UsersService {
       throw new HttpException('User não encontrado', HttpStatus.NOT_FOUND);
     }
 
+    const dataUser: { name?: string; passwordHash?: string } = {
+      name: updateUserDto.name ? updateUserDto.name : userExists.name,
+      passwordHash: updateUserDto.password
+        ? updateUserDto.password
+        : userExists.passwordHash,
+    };
+
+    if (updateUserDto?.password) {
+      const hashedPassword = await this.hashingSerivice.hash(
+        updateUserDto?.password,
+      );
+
+      dataUser['passwordHash'] = hashedPassword;
+    }
     const updateUser = await this.prisma.user.update({
       where: {
         id: userExists.id,
       },
       data: {
-        name: updateUserDto.name ? updateUserDto.name : userExists.name, // se ele mandar algo atualiza, senao, mantem o que esta savlo no banco
-        email: updateUserDto.email ? updateUserDto.email : userExists.email, // se ele mandar algo atualiza, senao, mantem o que esta savlo no banco
-        passwordHash: updateUserDto.password
-          ? updateUserDto.password
-          : userExists.passwordHash, // se ele mandar algo atualiza, senao, mantem o que esta savlo no banco
+        name: dataUser.name,
+        passwordHash: dataUser.passwordHash
+          ? dataUser.passwordHash
+          : userExists.passwordHash,
       },
       select: {
         id: true,

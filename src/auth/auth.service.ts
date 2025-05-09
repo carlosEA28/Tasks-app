@@ -16,7 +16,7 @@ export class AuthService {
     private readonly jwtConfigurartion: ConfigType<typeof jwtConfig>,
     private readonly jwtService: JwtService,
   ) {
-    console.log(jwtConfigurartion);
+    // console.log(jwtConfigurartion);
   }
 
   async authenticate(singInDto: SignInDto) {

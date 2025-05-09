@@ -4,6 +4,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { PayloadTokenDto } from 'src/auth/dto/payload-token.dto';
 
 @Injectable()
 export class TasksService {
@@ -34,20 +35,24 @@ export class TasksService {
     throw new HttpException('Tarefa não foi encontrada', HttpStatus.NOT_FOUND);
   }
 
-  async create(createTaskDto: CreateTaskDto) {
+  async create(createTaskDto: CreateTaskDto, tokenPayload: PayloadTokenDto) {
     const newTask = await this.prisma.task.create({
       data: {
         name: createTaskDto.name,
         description: createTaskDto.description,
         completed: false,
-        userId: createTaskDto.userId,
+        userId: tokenPayload.sub,
       },
     });
 
     return newTask;
   }
 
-  async update(id: number, updateTaskDto: UpdateTaskDto) {
+  async update(
+    id: number,
+    updateTaskDto: UpdateTaskDto,
+    tokenPayload: PayloadTokenDto,
+  ) {
     const task = await this.prisma.task.findFirst({
       where: {
         id: id,
@@ -55,6 +60,13 @@ export class TasksService {
     });
 
     if (!task) {
+      throw new HttpException(
+        'Tarefa não foi encontrada',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (task.userId !== tokenPayload.sub) {
       throw new HttpException(
         'Tarefa não foi encontrada',
         HttpStatus.NOT_FOUND,
@@ -71,7 +83,7 @@ export class TasksService {
     return newTask;
   }
 
-  async delete(id: number) {
+  async delete(id: number, tokenPayload: PayloadTokenDto) {
     const task = await this.prisma.task.delete({
       where: {
         id: id,
@@ -85,6 +97,9 @@ export class TasksService {
       );
     }
 
+    if (task.userId !== tokenPayload.sub) {
+      throw new HttpException('Erro ao deletar', HttpStatus.NOT_FOUND);
+    }
     return {
       message: 'Tarefa deletada',
     };
